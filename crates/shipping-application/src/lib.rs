@@ -9,4 +9,7 @@ pub mod error;
 pub mod ports;
 pub mod usecases;
 
+#[cfg(test)]
+mod testing;
+
 pub use error::ApplicationError;

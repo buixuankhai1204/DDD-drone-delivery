@@ -86,3 +86,33 @@ impl Parcel {
         self.fragile
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn dims() -> Dimensions {
+        Dimensions::new(200, 150, 100).unwrap()
+    }
+
+    #[test]
+    fn enforces_weight_limits() {
+        assert!(Parcel::new(0, dims(), "books", false).is_err());
+        assert!(Parcel::new(MAX_PARCEL_WEIGHT_GRAMS + 1, dims(), "books", false).is_err());
+        assert!(Parcel::new(MAX_PARCEL_WEIGHT_GRAMS, dims(), "books", false).is_ok());
+    }
+
+    #[test]
+    fn enforces_dimension_limits() {
+        assert!(Dimensions::new(0, 10, 10).is_err());
+        assert!(Dimensions::new(10, MAX_PARCEL_DIMENSION_MM + 1, 10).is_err());
+    }
+
+    #[test]
+    fn description_is_required() {
+        assert_eq!(
+            Parcel::new(100, dims(), " ", false).unwrap_err(),
+            DomainError::BlankField("parcel description")
+        );
+    }
+}

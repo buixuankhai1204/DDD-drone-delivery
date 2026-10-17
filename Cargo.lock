@@ -1539,6 +1539,7 @@ dependencies = [
  "anyhow",
  "axum",
  "dotenvy",
+ "http-body-util",
  "serde",
  "serde_json",
  "shipping-application",
@@ -1547,6 +1548,7 @@ dependencies = [
  "sqlx",
  "tokio",
  "tokio-util",
+ "tower",
  "tower-http",
  "tracing",
  "tracing-subscriber",
@@ -1563,6 +1565,7 @@ dependencies = [
  "serde_json",
  "shipping-domain",
  "thiserror",
+ "tokio",
  "tracing",
  "uuid",
 ]
@@ -1583,6 +1586,7 @@ name = "shipping-infrastructure"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "axum",
  "chrono",
  "reqwest",
  "serde",

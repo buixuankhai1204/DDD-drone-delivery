@@ -42,3 +42,30 @@ impl fmt::Display for TrackingNumber {
         f.write_str(&self.0)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generated_numbers_round_trip_through_parse() {
+        let generated = TrackingNumber::generate();
+        assert_eq!(
+            TrackingNumber::parse(generated.as_str()).unwrap(),
+            generated
+        );
+    }
+
+    #[test]
+    fn parse_is_case_insensitive_and_strict() {
+        assert_eq!(
+            TrackingNumber::parse(" drn-3f9a1c07b2e4 ")
+                .unwrap()
+                .as_str(),
+            "DRN-3F9A1C07B2E4"
+        );
+        assert!(TrackingNumber::parse("DRN-123").is_err());
+        assert!(TrackingNumber::parse("XXX-3F9A1C07B2E4").is_err());
+        assert!(TrackingNumber::parse("DRN-ZZZZZZZZZZZZ").is_err());
+    }
+}
