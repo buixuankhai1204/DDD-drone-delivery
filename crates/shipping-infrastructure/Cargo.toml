@@ -1,0 +1,27 @@
+[package]
+name = "shipping-infrastructure"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+shipping-domain.workspace = true
+shipping-application.workspace = true
+
+async-trait.workspace = true
+chrono.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+axum.workspace = true
+
+[lints]
+workspace = true

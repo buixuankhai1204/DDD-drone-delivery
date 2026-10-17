@@ -1,0 +1,38 @@
+[package]
+name = "shipping-api"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+name = "shipping_api"
+path = "src/lib.rs"
+
+[[bin]]
+name = "shipping-api"
+path = "src/main.rs"
+
+[dependencies]
+shipping-domain.workspace = true
+shipping-application.workspace = true
+shipping-infrastructure.workspace = true
+
+anyhow.workspace = true
+axum.workspace = true
+dotenvy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+http-body-util.workspace = true
+tower.workspace = true
+
+[lints]
+workspace = true

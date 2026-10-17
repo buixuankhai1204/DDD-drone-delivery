@@ -1,0 +1,22 @@
+[package]
+name = "shipping-application"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+shipping-domain.workspace = true
+
+async-trait.workspace = true
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+
+[lints]
+workspace = true
