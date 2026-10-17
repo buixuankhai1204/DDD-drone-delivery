@@ -384,3 +384,210 @@ impl Shipment {
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::value_objects::{Dimensions, GeoPoint};
+
+    fn location(lat: f64, lon: f64, address: &str) -> Location {
+        Location::new(GeoPoint::new(lat, lon).unwrap(), address).unwrap()
+    }
+
+    fn new_shipment() -> NewShipment {
+        NewShipment {
+            customer_id: CustomerId::new(),
+            recipient: Recipient::new("Nguyen Van A", "+84901234567").unwrap(),
+            parcel: Parcel::new(
+                1_500,
+                Dimensions::new(200, 150, 100).unwrap(),
+                "Phone case",
+                true,
+            )
+            .unwrap(),
+            // ~2.3 km apart
+            pickup: location(21.0285, 105.8542, "Hoan Kiem, Hanoi"),
+            dropoff: location(21.0380, 105.8340, "Ba Dinh, Hanoi"),
+        }
+    }
+
+    fn drone() -> DroneProfile {
+        DroneProfile {
+            id: DroneId::new(),
+            max_payload_grams: 3_000,
+            max_range_m: 10_000,
+        }
+    }
+
+    fn route() -> RoutePlan {
+        RoutePlan::new(3_200, 420).unwrap()
+    }
+
+    fn requested() -> Shipment {
+        Shipment::request(new_shipment(), Utc::now()).unwrap()
+    }
+
+    fn in_transit() -> Shipment {
+        let mut s = requested();
+        s.schedule(&drone(), route(), Utc::now()).unwrap();
+        s.record_pickup(Utc::now()).unwrap();
+        s
+    }
+
+    #[test]
+    fn new_shipment_is_requested_and_records_event() {
+        let s = requested();
+        assert_eq!(s.status(), ShipmentStatus::Requested);
+        assert!(s.is_new());
+        assert_eq!(s.history().len(), 1);
+        assert!(matches!(
+            s.pending_events(),
+            [ShipmentEvent::Requested { .. }]
+        ));
+    }
+
+    #[test]
+    fn rejects_pickup_and_dropoff_that_are_too_close_or_too_far() {
+        let mut too_close = new_shipment();
+        too_close.dropoff = too_close.pickup.clone();
+        assert!(matches!(
+            Shipment::request(too_close, Utc::now()),
+            Err(DomainError::LocationsTooClose { .. })
+        ));
+
+        let mut too_far = new_shipment();
+        too_far.dropoff = location(10.7769, 106.7009, "Ho Chi Minh City");
+        assert!(matches!(
+            Shipment::request(too_far, Utc::now()),
+            Err(DomainError::OutsideServiceArea { .. })
+        ));
+    }
+
+    #[test]
+    fn happy_path_walks_through_every_state() {
+        let now = Utc::now();
+        let mut s = requested();
+        let d = drone();
+
+        s.schedule(&d, route(), now).unwrap();
+        assert_eq!(s.status(), ShipmentStatus::Scheduled);
+        assert_eq!(s.assigned_drone(), Some(d.id));
+        assert_eq!(
+            s.estimated_delivery_at(),
+            Some(now + Duration::seconds(420))
+        );
+
+        s.record_pickup(now).unwrap();
+        assert_eq!(s.status(), ShipmentStatus::InTransit);
+
+        s.record_delivery(now).unwrap();
+        assert_eq!(s.status(), ShipmentStatus::Delivered);
+        assert!(s.status().is_terminal());
+
+        let statuses: Vec<_> = s.history().iter().map(|e| e.status).collect();
+        assert_eq!(
+            statuses,
+            [
+                ShipmentStatus::Requested,
+                ShipmentStatus::Scheduled,
+                ShipmentStatus::InTransit,
+                ShipmentStatus::Delivered
+            ]
+        );
+        assert_eq!(s.pending_events().len(), 4);
+    }
+
+    #[test]
+    fn scheduling_requires_a_suitable_drone() {
+        let mut s = requested();
+        let weak = DroneProfile {
+            max_payload_grams: 500,
+            ..drone()
+        };
+        assert!(matches!(
+            s.schedule(&weak, route(), Utc::now()),
+            Err(DomainError::DroneCannotCarryParcel { .. })
+        ));
+        // nothing changed
+        assert_eq!(s.status(), ShipmentStatus::Requested);
+        assert_eq!(s.assigned_drone(), None);
+    }
+
+    #[test]
+    fn cannot_schedule_twice() {
+        let mut s = requested();
+        s.schedule(&drone(), route(), Utc::now()).unwrap();
+        assert!(matches!(
+            s.schedule(&drone(), route(), Utc::now()),
+            Err(DomainError::InvalidStateTransition { .. })
+        ));
+    }
+
+    #[test]
+    fn cannot_pick_up_before_scheduling() {
+        let mut s = requested();
+        assert!(matches!(
+            s.record_pickup(Utc::now()),
+            Err(DomainError::InvalidStateTransition { .. })
+        ));
+    }
+
+    #[test]
+    fn cancel_is_allowed_before_pickup_only() {
+        let mut before = requested();
+        before.cancel(Some("changed my mind"), Utc::now()).unwrap();
+        assert_eq!(before.status(), ShipmentStatus::Cancelled);
+
+        let mut scheduled = requested();
+        let d = drone();
+        scheduled.schedule(&d, route(), Utc::now()).unwrap();
+        scheduled.cancel(None, Utc::now()).unwrap();
+        assert!(matches!(
+            scheduled.pending_events().last(),
+            Some(ShipmentEvent::Cancelled { drone_id: Some(id), .. }) if *id == d.id
+        ));
+
+        let mut flying = in_transit();
+        assert!(matches!(
+            flying.cancel(None, Utc::now()),
+            Err(DomainError::InvalidStateTransition { .. })
+        ));
+    }
+
+    #[test]
+    fn terminal_states_are_final() {
+        let mut cancelled = requested();
+        cancelled.cancel(None, Utc::now()).unwrap();
+        assert!(cancelled.cancel(None, Utc::now()).is_err());
+        assert!(cancelled.schedule(&drone(), route(), Utc::now()).is_err());
+
+        let mut delivered = in_transit();
+        delivered.record_delivery(Utc::now()).unwrap();
+        assert!(delivered.record_delivery(Utc::now()).is_err());
+        assert!(delivered.record_delivery_failure("x", Utc::now()).is_err());
+    }
+
+    #[test]
+    fn delivery_failure_requires_a_reason_and_pickup() {
+        let mut s = in_transit();
+        assert_eq!(
+            s.record_delivery_failure("  ", Utc::now()).unwrap_err(),
+            DomainError::BlankField("reason")
+        );
+        s.record_delivery_failure("Recipient unreachable", Utc::now())
+            .unwrap();
+        assert_eq!(s.status(), ShipmentStatus::Failed);
+
+        let mut not_flying = requested();
+        assert!(not_flying.record_delivery_failure("x", Utc::now()).is_err());
+    }
+
+    #[test]
+    fn mark_persisted_clears_events_and_bumps_version() {
+        let mut s = requested();
+        s.mark_persisted();
+        assert!(!s.is_new());
+        assert_eq!(s.version(), 1);
+        assert!(s.pending_events().is_empty());
+    }
+}

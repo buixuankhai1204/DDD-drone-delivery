@@ -70,3 +70,39 @@ impl Location {
         &self.address
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_out_of_range_and_non_finite_coordinates() {
+        assert!(GeoPoint::new(90.1, 0.0).is_err());
+        assert!(GeoPoint::new(0.0, -180.5).is_err());
+        assert!(GeoPoint::new(f64::NAN, 0.0).is_err());
+        assert!(GeoPoint::new(21.03, 105.85).is_ok());
+    }
+
+    #[test]
+    fn haversine_distance_is_plausible() {
+        // Hanoi Opera House -> Hoan Kiem Lake (~ 600 m apart).
+        let a = GeoPoint::new(21.0245, 105.8576).unwrap();
+        let b = GeoPoint::new(21.0287, 105.8522).unwrap();
+        let d = a.distance_to(&b);
+        assert!((500..800).contains(&d), "unexpected distance {d}");
+        assert_eq!(a.distance_to(&a), 0);
+    }
+
+    #[test]
+    fn address_is_trimmed_and_required() {
+        let p = GeoPoint::new(0.0, 0.0).unwrap();
+        assert_eq!(
+            Location::new(p, "  1 Main St ").unwrap().address(),
+            "1 Main St"
+        );
+        assert_eq!(
+            Location::new(p, "   ").unwrap_err(),
+            DomainError::BlankField("address")
+        );
+    }
+}

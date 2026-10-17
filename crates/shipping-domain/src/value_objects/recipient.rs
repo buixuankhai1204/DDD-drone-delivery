@@ -36,3 +36,21 @@ impl Recipient {
         &self.phone
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validates_phone_format() {
+        assert!(Recipient::new("An", "+84901234567").is_ok());
+        assert!(Recipient::new("An", "0901234567").is_err());
+        assert!(Recipient::new("An", "+84 90 123").is_err());
+        assert!(Recipient::new("An", "+1234567").is_err());
+    }
+
+    #[test]
+    fn name_is_required() {
+        assert!(Recipient::new("  ", "+84901234567").is_err());
+    }
+}

@@ -2,6 +2,8 @@ mod dispatch_shipment;
 mod lifecycle;
 mod queries;
 mod request_shipment;
+#[cfg(test)]
+mod tests;
 
 pub use dispatch_shipment::DispatchShipment;
 pub use lifecycle::{CancelShipment, RecordDelivery, RecordPickup, ReportDeliveryFailure};

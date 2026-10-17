@@ -56,7 +56,7 @@ Requested ──► Scheduled ──► InTransit ──► Delivered
     └──► Cancelled ◄┘          └──► Failed
 ```
 
-Invariants (all enforced in the domain layer):
+Invariants (all in the domain layer, covered by unit tests):
 
 * parcel: 1 g – 5 kg, each side ≤ 500 mm, description required
 * recipient phone in international format (`+84901234567`)
@@ -161,6 +161,18 @@ Configuration (environment variables, `.env` is loaded if present):
 | `EXTERNAL_SERVICES` | `http` | `http` or `stub` |
 | `FLEET_SERVICE_URL`, `FLIGHT_PLANNING_URL` | – | required when `EXTERNAL_SERVICES=http` |
 | `RUST_LOG` | `info,sqlx=warn,tower_http=info` | |
+
+### Tests
+
+```bash
+cargo test --workspace            # unit tests + HTTP gateway tests, no database needed
+
+DATABASE_URL=postgres://shipping:shipping@localhost:5432/shipping \
+  cargo test --workspace -- --include-ignored   # + PostgreSQL and end-to-end API tests
+```
+
+The database tests use `#[sqlx::test]`: every test gets its own throw-away
+database, so they can run in parallel and leave nothing behind.
 
 ## Design notes and trade-offs
 
